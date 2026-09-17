@@ -1,13 +1,173 @@
 <!doctype html>
 <html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Orfebrería Sezar — Catálogo y Fichas</title>
-    <script type="module" crossorigin src="/fichas-sezar/assets/index-_OQ5a6n7.js"></script>
-    <link rel="stylesheet" crossorigin href="/fichas-sezar/assets/index-CE43T83C.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Catálogo de fichas de orfebrería." />
+  <title>Catálogo de Orfebrería</title>
+  <style>
+    :root { --ink:#1d1b19; --muted:#706a63; --paper:#faf8f3; --card:#fff; --line:#e6e0d6; --gold:#9a6f32; --gold-dark:#72501e; --shadow:0 8px 24px rgba(53,38,21,.08); }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font-family:Georgia, 'Times New Roman', serif; }
+    header { color:#fff; background:linear-gradient(125deg,#211b15,#62461f); padding:48px 22px 36px; }
+    .wrap { width:min(1180px, calc(100% - 36px)); margin:auto; }
+    h1 { margin:0; font-size:clamp(2rem,5vw,3.8rem); letter-spacing:.02em; }
+    .subtitle { margin:12px 0 0; color:#ede4d5; font-family:Arial,sans-serif; font-size:1rem; }
+    main { padding:28px 0 56px; }
+    .tools { display:grid; grid-template-columns:2fr 1fr auto; gap:12px; align-items:center; margin-bottom:24px; }
+    input, select, button { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff; color:var(--ink); }
+    button { width:auto; cursor:pointer; background:var(--gold); color:white; border-color:var(--gold); font-family:Arial,sans-serif; font-weight:700; }
+    button:hover { background:var(--gold-dark); }
+    #status { color:var(--muted); font-family:Arial,sans-serif; margin:0 0 18px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(245px,1fr)); gap:18px; }
+    .card { display:flex; flex-direction:column; min-height:250px; padding:20px; border:1px solid var(--line); border-radius:12px; background:var(--card); box-shadow:var(--shadow); }
+    .tag { display:inline-block; width:max-content; max-width:100%; padding:5px 9px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border-radius:99px; background:#f1eadc; color:var(--gold-dark); font:700 .73rem Arial,sans-serif; letter-spacing:.04em; text-transform:uppercase; }
+    .ref { margin:16px 0 7px; color:var(--muted); font:700 .76rem Arial,sans-serif; letter-spacing:.08em; }
+    h2 { margin:0; font-size:1.36rem; line-height:1.22; }
+    .description { margin:11px 0 18px; color:#554f49; line-height:1.48; font-size:.96rem; }
+    .meta { margin-top:auto; padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font: .83rem Arial,sans-serif; }
+    dialog { width:min(720px,calc(100% - 30px)); padding:0; border:0; border-radius:14px; box-shadow:0 20px 70px rgba(0,0,0,.3); }
+    dialog::backdrop { background:rgba(0,0,0,.48); }
+    .modal { padding:26px; }
+    .modal-head { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; }
+    .modal h2 { font-size:1.8rem; }
+    .close { width:38px; min-height:38px; padding:0; border-radius:50%; font-size:1.2rem; }
+    .detail { margin:22px 0 0; white-space:pre-wrap; line-height:1.55; }
+    .error { padding:18px; border:1px solid #e8b4aa; border-radius:10px; background:#fff0ed; color:#853524; font-family:Arial,sans-serif; }
+    footer { padding:24px 0 32px; color:var(--muted); font:.85rem Arial,sans-serif; text-align:center; }
+    @media (max-width:680px) { .tools { grid-template-columns:1fr; } .tools button { width:100%; } header { padding-top:36px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Catálogo de Orfebrería</h1>
+      <p class="subtitle">Consulta de fichas, referencias y detalles de fabricación.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="tools" aria-label="Filtros del catálogo">
+      <input id="search" type="search" placeholder="Buscar por referencia, nombre o descripción…" autocomplete="off" />
+      <select id="category"><option value="">Todas las categorías</option></select>
+      <button id="clear" type="button">Limpiar</button>
+    </section>
+    <p id="status" role="status">Cargando fichas…</p>
+    <section id="grid" class="grid" aria-live="polite"></section>
+  </main>
+
+  <dialog id="detailDialog">
+    <article class="modal">
+      <div class="modal-head"><div><span id="modalCategory" class="tag"></span><p id="modalRef" class="ref"></p><h2 id="modalName"></h2></div><button id="closeDialog" class="close" type="button" aria-label="Cerrar">×</button></div>
+      <p id="modalDescription" class="description"></p>
+      <div id="modalDetail" class="detail"></div>
+    </article>
+  </dialog>
+
+  <footer>Catálogo interno · Datos almacenados en Supabase</footer>
+
+  <script type="module">
+    /*
+      CONFIGURACIÓN OBLIGATORIA
+      1. En Supabase: Project Settings > API
+      2. Copia Project URL y la clave publishable/anon pública.
+      3. No utilices nunca una clave service_role en esta página.
+    */
+    const SUPABASE_URL = 'https://ilyqptxotvlfnoiktfxj.supabase.co/rest/v1/';
+    const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_asvPoCYU4cHw02IgtBSjvg_KxB6gJ19';
+    const TABLE_NAME = 'fichas';
+
+    const grid = document.querySelector('#grid');
+    const status = document.querySelector('#status');
+    const search = document.querySelector('#search');
+    const category = document.querySelector('#category');
+    const clear = document.querySelector('#clear');
+    const dialog = document.querySelector('#detailDialog');
+    const closeDialog = document.querySelector('#closeDialog');
+    let records = [];
+
+    function text(value) { return value == null ? '' : String(value); }
+    function escapeHTML(value) { return text(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+    function getName(item) { return item.name || item.nombre || item.titulo || 'Ficha sin nombre'; }
+    function getRef(item) { return item.ref || item.referencia || item.codigo || item.id || ''; }
+    function getCategory(item) { return item.category || item.categoria || 'Sin categoría'; }
+    function getDescription(item) { return item.description || item.descripcion || item.full_text || ''; }
+    function getDetail(item) {
+      const despiece = item.despiece;
+      if (!despiece) return item.notes_ficha || item.notas || '';
+      const lines = [];
+      if (despiece.peso_aprox_g) lines.push(`Peso aproximado: ${despiece.peso_aprox_g} g`);
+      if (despiece.tiempo_estimado_horas) lines.push(`Tiempo estimado: ${despiece.tiempo_estimado_horas} h`);
+      if (despiece.materiales_principales) lines.push(`Materiales: ${despiece.materiales_principales}`);
+      if (despiece.precio_referencia) lines.push(`Precio de referencia: ${despiece.precio_referencia}`);
+      if (despiece.notas_generales) lines.push(`Notas: ${despiece.notas_generales}`);
+      return lines.join('\n') || item.notes_ficha || item.notas || '';
+    }
+
+    function filtered() {
+      const q = search.value.trim().toLocaleLowerCase('es');
+      return records.filter(item => {
+        const matchesCategory = !category.value || getCategory(item) === category.value;
+        const haystack = [getRef(item), getName(item), getDescription(item)].join(' ').toLocaleLowerCase('es');
+        return matchesCategory && (!q || haystack.includes(q));
+      });
+    }
+
+    function render() {
+      const items = filtered();
+      status.textContent = items.length === records.length ? `${records.length} fichas disponibles` : `${items.length} de ${records.length} fichas`;
+      grid.innerHTML = items.map((item, index) => `
+        <article class="card">
+          <span class="tag">${escapeHTML(getCategory(item))}</span>
+          <p class="ref">REF. ${escapeHTML(getRef(item))}</p>
+          <h2>${escapeHTML(getName(item))}</h2>
+          <p class="description">${escapeHTML(getDescription(item))}</p>
+          <div class="meta"><button type="button" data-index="${index}">Ver ficha</button></div>
+        </article>`).join('');
+      if (!items.length) grid.innerHTML = '<p class="error">No se han encontrado fichas con esos filtros.</p>';
+      grid.querySelectorAll('button[data-index]').forEach(button => button.addEventListener('click', () => openDetail(items[Number(button.dataset.index)])));
+    }
+
+    function openDetail(item) {
+      document.querySelector('#modalCategory').textContent = getCategory(item);
+      document.querySelector('#modalRef').textContent = `REF. ${getRef(item)}`;
+      document.querySelector('#modalName').textContent = getName(item);
+      document.querySelector('#modalDescription').textContent = getDescription(item);
+      document.querySelector('#modalDetail').textContent = getDetail(item) || 'No hay detalles adicionales en esta ficha.';
+      dialog.showModal();
+    }
+
+    function setCategories() {
+      [...new Set(records.map(getCategory))].sort((a,b) => a.localeCompare(b, 'es')).forEach(value => {
+        const option = document.createElement('option'); option.value = value; option.textContent = value; category.append(option);
+      });
+    }
+
+    async function load() {
+      if (SUPABASE_URL.includes('PEGA_AQUI') || SUPABASE_PUBLISHABLE_KEY.includes('PEGA_AQUI')) {
+        status.innerHTML = '<span class="error">Falta configurar Supabase. Edita las constantes SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY al final de este archivo.</span>';
+        return;
+      }
+      try {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+        const { data, error } = await supabase.from(TABLE_NAME).select('*').order('ref', { ascending: true });
+        if (error) throw error;
+        records = data || [];
+        setCategories();
+        render();
+      } catch (error) {
+        console.error(error);
+        status.innerHTML = `<span class="error">No se han podido cargar las fichas: ${escapeHTML(error.message || 'error desconocido')}. Comprueba la URL, la clave pública, el nombre de la tabla y las políticas RLS de lectura.</span>`;
+      }
+    }
+
+    search.addEventListener('input', render);
+    category.addEventListener('change', render);
+    clear.addEventListener('click', () => { search.value = ''; category.value = ''; render(); });
+    closeDialog.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+    load();
+  </script>
+</body>
 </html>
